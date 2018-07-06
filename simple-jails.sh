@@ -101,4 +101,29 @@ sjail_set_skel(){
 
     cd "${current_dir}"
     echo  "WRKDIRPREFIX?=  /skeleton/portbuild" >> ${zfs_jail_mount}/templates/skeleton-${version}/etc/make.conf
+    zfs snapshot ${zfs_data_set}/templates/skeleton-${version}@skeleton
+}
+
+sjail_create_thinjail() {
+    version="$1"
+    jail_name="$2"
+    echo "Setting up jail: $jail_name"
+    source /etc/simple-jails.conf
+    if [ ! -e ${zfs_jail_mount}/thinjails ]; then
+        zfs create ${zfs_data_set}/thinjails
+    fi
+
+    if [ -e ${zfs_jail_mount}/thinjails/${jail_name} ]; then
+        echo "Error: ${jail_name} already exists" 1>&2
+        exit 1
+    fi
+
+    zfs clone ${zfs_data_set}/templates/skeleton-${version}@skeleton ${zfs_data_set}/thinjails/${jail_name}
+    echo hostname=\"${jail_name}\" > ${zfs_jail_mount}thinjails/${jail_name}/etc/rc.conf
+
+    mkdir -p ${zfs_jail_mount}/${jail_name}
+    cat <<EOF > ${zfs_jail_mount}/${jail_name}.fstab
+${zfs_jail_mount}/templates/${version}-RELEASE  ${zfs_jail_mount}/${jail_name}/ nullfs   ro          0 0
+${zfs_jail_mount}/thinjails/${jail_name}     ${zfs_jail_mount}/${jail_name}/skeleton nullfs  rw  0 0
+EOF
 }
