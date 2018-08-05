@@ -57,6 +57,8 @@ sjail_fetch(){
     for i in $to_copy; do
         cp ${i} "${zfs_jail_mount}/templates/base-${version}${i}"
     done
+
+    sjail_set_skel "$version"
 }
 
 sjail_update(){
@@ -131,6 +133,36 @@ ${zfs_jail_mount}/thinjails/${jail_name}	${zfs_jail_mount}/${jail_name}/skeleton
 EOF
 }
 
+sjail_delete_thinjail() {
+    jail_name="$1"
+    echo "Deleting jail: $jail_name"
+    . /etc/simple-jails.conf
+    if grep "jail_enable=\"YES\"" /etc/rc.conf >/dev/null 2>&1; then
+        service jail stop "$jail_name" || true
+    else
+        service jail onestop "$jail_name" || true
+    fi
+
+    # SANITY CHECK
+    if [ -e "${zfs_jail_mount}/thinjails/${jail_name}" ]; then
+        zfs destroy "${zfs_data_set}/thinjails/${jail_name}"
+    else
+        echo "$jail_name" does not exists 1>&2 
+        exit 1
+    fi
+
+    # SANITY CHECK
+    if [ -z "$zfs_jail_mount" ]; then
+        echo "Will not delete /${jail_name}" 1>&2
+	exit 1
+    elif [ -z "$jail_name" ]; then
+        echo "Will not delete $zfs_jail_mount/" 1>&2
+	exit 1
+    else
+        rm -rf ${zfs_jail_mount}/${jail_name}*
+    fi
+}
+
 
 usage() {
     cat <<EOF
@@ -142,9 +174,10 @@ Commands:
                          (e.g. 11.2-RELEASE)
     update VERSION       Apply freebsd-update on base template with version
                          VERSION. Can be done anytime.
-    skel VERSION         Create skeleton from base template version VERSION
     create VERSION NAME  Create thin jail NAME from base template with version
                          VERSION. Update /etc/jail.conf manually.
+    delete Name          Delete thin jail NAME. Will stop if it currently
+                         running.
 EOF
     exit 0
 }
@@ -160,11 +193,11 @@ case $command in
     "update")
         sjail_update "$@"
         ;;
-    "skel"*)
-        sjail_set_skel "$@"
-        ;;
     "create")
         sjail_create_thinjail "$@"
+        ;;
+    "delete")
+        sjail_delete_thinjail "$@"
         ;;
     *)
         usage
