@@ -159,7 +159,8 @@ sjail_delete_thinjail() {
         echo "Will not delete $zfs_jail_mount/" 1>&2
 	exit 1
     else
-        rm -rf ${zfs_jail_mount}/${jail_name}*
+        rm -rf ${zfs_jail_mount}/${jail_name}
+        rm -rf ${zfs_jail_mount}/${jail_name}.fstab
     fi
 }
 
