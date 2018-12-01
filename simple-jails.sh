@@ -18,7 +18,7 @@ sjail_init(){
         echo "Error: /etc/simple-jails.conf already exists" 1>&2
         exit 1
     fi
-    printf "Please enter the ZFS dataset (e.g. zpool/jails: "
+    printf "Please enter the ZFS dataset (e.g. zpool/jails): "
     read zfs_data_set
     printf "Please enter the mount point: "
     read zfs_jail_mount
@@ -27,6 +27,57 @@ sjail_init(){
 zfs_data_set=${zfs_data_set}
 zfs_jail_mount=${zfs_jail_mount}
 EOF
+    printf "Do you want simple-jails to setup cloned_if? [y/N]: "
+    read answer
+    while true; do
+        case "$answer" in
+            y|Y)
+                cat >> /etc/rc.conf <<EOF
+cloned_if="lo1"
+ipv4_addrs_lo1="192.168.0.1-254/24"
+EOF
+                service netif cloneup
+                break
+                ;;
+            n|N)
+                echo "You're on your own"
+                break
+                ;;
+            *)
+                echo "Please answer with either 'y' or 'n' (without quotes)"
+                ;;
+        esac
+    done
+
+    printf "Do you want an initial jails.conf? [y/N]: "
+    read answer
+    while true; do
+        case "$answer" in
+            y|Y)
+                cat > /etc/jails.conf <<EOF
+# Global settings applied to all jails
+
+host.hostname = "\$name.domain.local";
+path = "${zfs_jail_mount}/\$name";
+mount.fstab = "${zfs_jail_mount}/\$name.fstab";
+
+exec.start = "/bin/sh /etc/rc";
+exec.stop = "/bin/sh /etc/rc.shutdown";
+exec.clean;
+mount.devfs;
+EOF
+                break
+                ;;
+            n|N)
+                echo "You're on your own"
+                break
+                ;;
+            *)
+                echo "Please answer with either 'y' or 'n' (without quotes)"
+                ;;
+        esac
+    done
+
 }
 
 sjail_fetch(){
@@ -55,7 +106,7 @@ sjail_fetch(){
     done
 
     for i in $to_copy; do
-        cp ${i} "${zfs_jail_mount}/templates/base-${version}${i}"
+        cp ${i} "${zfs_jail_mount}/templates/base-${version}${i}" || true
     done
 
     sjail_set_skel "$version"
